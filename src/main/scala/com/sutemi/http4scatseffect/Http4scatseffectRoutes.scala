@@ -31,6 +31,7 @@ object Http4scatseffectRoutes {
     }
   }
 
+  // todo at what point should I refactor this to its own class/object to match the pet store example?
   def hutRoutes[F[_]: Concurrent](H: Huts[F]): HttpRoutes[F] = {
     val dsl = new Http4sDsl[F]{}
     import dsl._
@@ -47,8 +48,12 @@ object Http4scatseffectRoutes {
           uuid <- H.addHut(hut)
           resp <- Created(uuid)
         } yield resp
-        // todo add/update hut
-        // todo delete hut
+        // todo update hut
+      case DELETE -> Root / "huts" / id =>
+        for {
+          hut <- H.delete(id)
+          resp <- hut.fold(NotFound())(_ => NoContent())
+        } yield resp
     }
   }
 }

@@ -22,10 +22,11 @@ import scala.collection.mutable.ListBuffer
 trait Huts[F[_]] {
   def get(id: String): F[Option[Huts.HutWithId]]
   def addHut(hut: Huts.Hut): F[String]
+  def delete(id: String): F[Option[Huts.HutWithId]]
 }
 
 object Huts {
-  // todo why do I need the summon apply? for test maybe?
+  // needed for the tests
   def apply[F[_]](implicit ev: Huts[F]): Huts[F] = ev
 
   // why does this need to extend AnyVal? What does the case class extend otherwise?
@@ -45,8 +46,6 @@ object Huts {
     implicit def hutWithIdEntityEncoder[F[_]]: EntityEncoder[F, HutWithId] = jsonEncoderOf
   }
 
-  // todo this will probably want to be a Sync eventually not an Applicative - Sync is Applicative after
-  // todo some layers. Which is "lowest power"?
   // todo hm, this feeling like a bit of boilerplate....
   def impl[F[_]](hutRepo: HutRepository[F]): Huts[F] = new Huts[F] {
     def get(id: String): F[Option[Huts.HutWithId]] =
@@ -54,6 +53,9 @@ object Huts {
 
     def addHut(hut: Huts.Hut): F[String] =
       hutRepo.addHut(hut)
+
+    def delete(id: String): F[Option[Huts.HutWithId]] =
+      hutRepo.deleteHut(id)
   }
 }
 
@@ -93,16 +95,18 @@ final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWith
 //      _ <- IO { huts += hut }
 //    } yield ()
 //
-//  def deleteHut(hut: Huts.HutWithId): IO[Unit] =
-//    for {
-//      _ <- IO {
-//        huts.find(_.id == hut.id).map {
-//          h => IO {
-//            huts -= h
-//          }
-//        }
-//      }
-//    } yield ()
+
+  // todo should I simplify the naming here?
+  // todo is F[Option[Huts.HutWithId]] the best way to capture the found/deleted stuff?
+  def deleteHut(id: String): F[Option[Huts.HutWithId]] = {
+    huts.find(_.id == id)
+      .map { h =>
+        // todo this does feel like this is doing side effects and wrapping that in the pure[F]
+        // todo will see what happens when we move to more real repository
+        huts -= h
+        h
+      }.pure[F]
+  }
 }
 
 object HutRepository {
