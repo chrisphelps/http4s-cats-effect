@@ -21,7 +21,7 @@ import scala.collection.mutable.ListBuffer
 // Huts Algebra
 trait Huts[F[_]] {
   def get(id: String): F[Option[Huts.HutWithId]]
-  def addHut(hut: Huts.Hut): F[String]
+  def addHut(hut: Huts.Hut): F[Huts.HutWithId]
   def delete(id: String): F[Option[Huts.HutWithId]]
 }
 
@@ -51,8 +51,9 @@ object Huts {
     def get(id: String): F[Option[Huts.HutWithId]] =
       hutRepo.getHut(id)
 
-    def addHut(hut: Huts.Hut): F[String] =
+    def addHut(hut: Huts.Hut): F[Huts.HutWithId] = {
       hutRepo.addHut(hut)
+    }
 
     def delete(id: String): F[Option[Huts.HutWithId]] =
       hutRepo.deleteHut(id)
@@ -76,11 +77,11 @@ final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWith
     id.pure[F]
   }
 
-  def addHut(hut: Huts.Hut): F[String] = {
+  def addHut(hut: Huts.Hut): F[Huts.HutWithId] = {
     for {
       uuid <- makeId
       _ <- huts.addOne(Huts.HutWithId(uuid, hut.name)).pure[F]
-    } yield uuid
+    } yield Huts.HutWithId(uuid, hut.name)
   }
 
   //  def addHut(hut: Huts.Hut): F[String] =
