@@ -1,12 +1,13 @@
 package com.sutemi.http4scatseffect
 
-import cats.Monad
-import cats.effect.Concurrent
+import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto._
 import org.http4s._
 import org.http4s.circe._
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+
 
 //import org.http4s.implicits._
 //import org.http4s.client.Client
@@ -47,20 +48,34 @@ object Huts {
   }
 
   // todo hm, this feeling like a bit of boilerplate....
-  def impl[F[_]](hutRepo: HutRepository[F]): Huts[F] = new Huts[F] {
-    def get(id: String): F[Option[Huts.HutWithId]] =
-      hutRepo.getHut(id)
-
-    def addHut(hut: Huts.Hut): F[Huts.HutWithId] = {
-      hutRepo.addHut(hut)
+  def impl[F[_]: Sync](hutRepo: HutRepository[F]): Huts[F] = new Huts[F] {
+    def get(id: String): F[Option[Huts.HutWithId]] = {
+      for {
+        logger <- Slf4jLogger.create[F]
+        _ <- logger.info(s"Get hut with id $id")
+        hut <- hutRepo.getHut(id)
+      } yield hut
     }
 
-    def delete(id: String): F[Option[Huts.HutWithId]] =
-      hutRepo.deleteHut(id)
+    def addHut(hut: Huts.Hut): F[Huts.HutWithId] = {
+      for {
+        logger <- Slf4jLogger.create[F]
+        _ <- logger.info(s"Add hut with name ${hut.name}")
+        hut <- hutRepo.addHut(hut)
+      } yield hut
+    }
+
+    def delete(id: String): F[Option[Huts.HutWithId]] = {
+      for {
+        logger <- Slf4jLogger.create[F]
+        _ <- logger.info(s"Delete hut with id $id")
+        hut <- hutRepo.deleteHut(id)
+      } yield hut
+    }
   }
 }
 
-final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWithId]) {
+final class HutRepository[F[_]: Sync](private val huts: ListBuffer[Huts.HutWithId]) {
 
   val makeId: F[String] =
     UUID.randomUUID().toString.pure[F]
@@ -69,8 +84,13 @@ final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWith
     Huts.HutWithId(id, "CannedName").pure[F]
 
 
-  def getHut(id: String): F[Option[Huts.HutWithId]] =
-    huts.find(_.id == id).pure[F]
+  def getHut(id: String): F[Option[Huts.HutWithId]] = {
+    for {
+      logger <- Slf4jLogger.create[F]
+      _ <- logger.info(s"GetHut for $id")
+      hut <- huts.find(_.id == id).pure[F]
+    } yield hut
+  }
 
   def addTestHut(id: String, hut: Huts.Hut): F[String] = {
     huts.addOne(Huts.HutWithId(id, hut.name))
@@ -83,12 +103,6 @@ final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWith
       _ <- huts.addOne(Huts.HutWithId(uuid, hut.name)).pure[F]
     } yield Huts.HutWithId(uuid, hut.name)
   }
-
-  //  def addHut(hut: Huts.Hut): F[String] =
-//    for {
-//      uuid <- makeId
-//      _ <- huts += Huts.HutWithId(uuid, hut.name).pure[F]
-//    } yield uuid
 
 //  def updateHut(hut: Huts.HutWithId): IO[Unit] =
 //    for {
@@ -111,6 +125,6 @@ final class HutRepository[F[_]: Monad](private val huts: ListBuffer[Huts.HutWith
 }
 
 object HutRepository {
-  def empty[F[_]: Monad]: HutRepository[F] = new HutRepository[F](ListBuffer())
+  def empty[F[_]: Sync]: HutRepository[F] = new HutRepository[F](ListBuffer())
 }
 
