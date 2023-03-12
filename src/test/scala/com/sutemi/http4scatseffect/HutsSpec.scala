@@ -55,6 +55,19 @@ class HutsSpec extends CatsEffectSuite {
     } yield ()
   }
 
+  test("add and update return correct status codes") {
+    for {
+      repo <- initHutRepository()
+      resp <- addHut(repo, Huts.Hut(name = "somename"))
+      addbody <- resp.as[Huts.HutWithId]
+      _ <- assertIO(getHut(repo, addbody.id).map(_.status), Status.Ok)
+      _ <- assertIO(updateHut(repo, Huts.HutWithId(addbody.id, "someothername")).map(_.status), Status.NoContent)
+      updateResp <- getHut(repo, addbody.id)
+      updated <- updateResp.as[Huts.HutWithId]
+      _ <- assertIO(IO{updated.name}, "someothername")
+    } yield ()
+  }
+
   private [this] def initHutRepository(): IO[HutRepository[IO]] = {
     val hutRepo = HutRepository.empty[IO]
     hutRepo.addTestHut("1", Huts.Hut("thetest"))
@@ -65,6 +78,12 @@ class HutsSpec extends CatsEffectSuite {
     val huts = Huts.impl[IO](hutRepo)
     val addHut = Request[IO](Method.POST, new Uri(path = Path.empty / "huts")).withEntity(hut)
     Http4scatseffectRoutes.hutRoutes(huts).orNotFound(addHut)
+  }
+
+  private[this] def updateHut(hutRepo: HutRepository[IO], hut: Huts.HutWithId): IO[Response[IO]] = {
+    val huts = Huts.impl[IO](hutRepo)
+    val updateHut = Request[IO](Method.PUT, new Uri(path = Path.empty / "huts" / hut.id)).withEntity(hut)
+    Http4scatseffectRoutes.hutRoutes(huts).orNotFound(updateHut)
   }
 
   private[this] def getHut(hutRepo: HutRepository[IO], id: String): IO[Response[IO]] = {

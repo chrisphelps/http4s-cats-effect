@@ -45,10 +45,16 @@ object Http4scatseffectRoutes {
       case req @ POST -> Root / "huts" =>
         for {
           hut <- req.as[Huts.Hut]
-          hwi <- H.addHut(hut)
+          hwi <- H.add(hut)
           resp <- Created(hwi)
         } yield resp
-        // todo update hut
+        // todo update
+      case req @ PUT -> Root / "huts" / id =>
+        for {
+          hut <- req.as[Huts.HutWithId]
+          _ <- H.update(id, hut)
+          resp <- NoContent()
+        } yield resp
       case DELETE -> Root / "huts" / id =>
         for {
           hut <- H.delete(id)

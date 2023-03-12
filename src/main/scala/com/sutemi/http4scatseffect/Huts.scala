@@ -22,7 +22,8 @@ import scala.collection.mutable.ListBuffer
 // Huts Algebra
 trait Huts[F[_]] {
   def get(id: String): F[Option[Huts.HutWithId]]
-  def addHut(hut: Huts.Hut): F[Huts.HutWithId]
+  def add(hut: Huts.Hut): F[Huts.HutWithId]
+  def update(id: String, hut: Huts.HutWithId): F[Unit]
   def delete(id: String): F[Option[Huts.HutWithId]]
 }
 
@@ -57,12 +58,20 @@ object Huts {
       } yield hut
     }
 
-    def addHut(hut: Huts.Hut): F[Huts.HutWithId] = {
+    def add(hut: Huts.Hut): F[Huts.HutWithId] = {
       for {
         logger <- Slf4jLogger.create[F]
         _ <- logger.info(s"Add hut with name ${hut.name}")
         hut <- hutRepo.addHut(hut)
       } yield hut
+    }
+
+    def update(id: String, hut: Huts.HutWithId): F[Unit] = {
+      for {
+        logger <- Slf4jLogger.create[F]
+        _ <- logger.info(s"Update hut with id $id")
+        _ <- hutRepo.updateHut(hut)
+      } yield ()
     }
 
     def delete(id: String): F[Option[Huts.HutWithId]] = {
@@ -82,7 +91,6 @@ final class HutRepository[F[_]: Sync](private val huts: ListBuffer[Huts.HutWithI
 
   def getCannedHut(id: String): F[Huts.HutWithId] =
     Huts.HutWithId(id, "CannedName").pure[F]
-
 
   def getHut(id: String): F[Option[Huts.HutWithId]] = {
     for {
@@ -104,12 +112,18 @@ final class HutRepository[F[_]: Sync](private val huts: ListBuffer[Huts.HutWithI
     } yield Huts.HutWithId(uuid, hut.name)
   }
 
-//  def updateHut(hut: Huts.HutWithId): IO[Unit] =
-//    for {
-//      _ <- IO { huts -= hut }
-//      _ <- IO { huts += hut }
-//    } yield ()
-//
+  // todo should this have something else for success/fail? Or does F capture that?
+  def updateHut(hut: Huts.HutWithId): F[Unit] =
+    for {
+      logger <- Slf4jLogger.create[F]
+      _ <- logger.info(s"Updating hut. Huts repo: $huts")
+      toremove <- huts.find(_.id == hut.id).pure[F]
+      // todo don't just assume the option here is Some
+      _ <- (huts -= toremove.get).pure[F]
+      _ <- (huts += hut).pure[F]
+      _ <- logger.info(s"Updated hut. Huts repo: $huts")
+    } yield ()
+
 
   // todo should I simplify the naming here?
   // todo is F[Option[Huts.HutWithId]] the best way to capture the found/deleted stuff?
