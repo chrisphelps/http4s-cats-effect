@@ -21,6 +21,7 @@ import scala.collection.mutable.ListBuffer
 
 // Huts Algebra
 trait Huts[F[_]] {
+  def getAll: F[List[Huts.HutWithId]]
   def get(id: String): F[Option[Huts.HutWithId]]
   def add(hut: Huts.Hut): F[Huts.HutWithId]
   def update(id: String, hut: Huts.HutWithId): F[Unit]
@@ -50,6 +51,15 @@ object Huts {
 
   // todo hm, this feeling like a bit of boilerplate....
   def impl[F[_]: Sync](hutRepo: HutRepository[F]): Huts[F] = new Huts[F] {
+
+    def getAll: F[List[Huts.HutWithId]] = {
+      for {
+        logger <- Slf4jLogger.create[F]
+        _ <- logger.info(s"Get all huts")
+        huts <- hutRepo.getAll
+      } yield huts
+    }
+
     def get(id: String): F[Option[Huts.HutWithId]] = {
       for {
         logger <- Slf4jLogger.create[F]
@@ -88,6 +98,9 @@ final class HutRepository[F[_]: Sync](private val huts: ListBuffer[Huts.HutWithI
 
   val makeId: F[String] =
     UUID.randomUUID().toString.pure[F]
+
+  def getAll: F[List[Huts.HutWithId]] =
+    huts.result().pure[F]
 
   def getCannedHut(id: String): F[Huts.HutWithId] =
     Huts.HutWithId(id, "CannedName").pure[F]

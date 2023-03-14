@@ -4,6 +4,7 @@ import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
+import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 
 object Http4scatseffectRoutes {
 
@@ -36,7 +37,11 @@ object Http4scatseffectRoutes {
     val dsl = new Http4sDsl[F]{}
     import dsl._
     HttpRoutes.of[F] {
-          // todo get all huts
+      case GET -> Root / "huts" =>
+        for {
+          huts <- H.getAll
+          resp <- Ok(huts)
+        } yield resp
       case GET -> Root / "huts" / id =>
         for {
           hut <- H.get(id)
@@ -48,7 +53,6 @@ object Http4scatseffectRoutes {
           hwi <- H.add(hut)
           resp <- Created(hwi)
         } yield resp
-        // todo update
       case req @ PUT -> Root / "huts" / id =>
         for {
           hut <- req.as[Huts.HutWithId]

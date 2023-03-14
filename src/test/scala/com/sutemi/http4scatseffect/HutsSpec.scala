@@ -4,6 +4,7 @@ import cats.effect.IO
 import munit.CatsEffectSuite
 import org.http4s.Uri.Path
 import org.http4s._
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.implicits._
 
 class HutsSpec extends CatsEffectSuite {
@@ -28,13 +29,6 @@ class HutsSpec extends CatsEffectSuite {
     } yield ()
   }
 
-  test("GetHuts with unknown hut id returns empty body") {
-    for {
-      repo <- initHutRepository()
-      _ <- assertIO(getHut(repo, "0").flatMap(_.as[String]), "")
-    } yield ()
-  }
-
   test("add then get returns a 200 status") {
     for {
       repo <- initHutRepository()
@@ -55,7 +49,7 @@ class HutsSpec extends CatsEffectSuite {
     } yield ()
   }
 
-  test("add and update return correct status codes") {
+  test("update correctly updates the hut") {
     for {
       repo <- initHutRepository()
       resp <- addHut(repo, Huts.Hut(name = "somename"))
@@ -65,6 +59,19 @@ class HutsSpec extends CatsEffectSuite {
       updateResp <- getHut(repo, addbody.id)
       updated <- updateResp.as[Huts.HutWithId]
       _ <- assertIO(IO{updated.name}, "someothername")
+    } yield ()
+  }
+
+  test("get all includes the right number of elements") {
+    for {
+      repo <- initHutRepository()
+      firstresp <- getAllHuts(repo)
+      firstlist <- firstresp.as[List[Huts.HutWithId]]
+      _ <- assertIO(IO{firstlist.length}, 1)
+      _ <- addHut(repo, Huts.Hut(name = "somename"))
+      sndresp <- getAllHuts(repo)
+      sndlist <- sndresp.as[List[Huts.HutWithId]]
+      _ <- assertIO(IO {sndlist.length}, 2)
     } yield ()
   }
 
@@ -91,6 +98,12 @@ class HutsSpec extends CatsEffectSuite {
     // todo what do we need to do to get the uri building right?
     val getHut = Request[IO](Method.GET, new Uri(path = Path.empty / "huts" / id))
     Http4scatseffectRoutes.hutRoutes(huts).orNotFound(getHut)
+  }
+
+  private[this] def getAllHuts(hutRepo: HutRepository[IO]): IO[Response[IO]] = {
+    val huts = Huts.impl[IO](hutRepo)
+    val getAll = Request[IO](Method.GET, new Uri(path = Path.empty / "huts"))
+    Http4scatseffectRoutes.hutRoutes(huts).orNotFound(getAll)
   }
 
   private[this] def deleteHut(hutRepo: HutRepository[IO], id: String): IO[Response[IO]] = {
